@@ -13,11 +13,15 @@ import {
 } from 'lucide-react';
 
 // --- GEMINI API SETUP ---
+// ⚠️ HARDCODED KEY FOR HACKATHON DEMO
 const apiKey = "AIzaSyADpSkuU4M0Uk_5OPmSiACvylZ4GuG_7Ng"; 
 
 const callGemini = async (prompt) => {
+  // Debug Log to check if key is loaded
+  console.log("Calling Gemini with key ending in:", apiKey.slice(-4));
+
   try {
-    // We are using the stable 'gemini-1.5-flash' model here
+    // Using the stable 'gemini-1.5-flash' model
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
@@ -29,36 +33,39 @@ const callGemini = async (prompt) => {
       }
     );
 
+    // DEBUG: Alert if the API fails
     if (!response.ok) {
-      const errorDetails = await response.json();
-      console.error("API Error:", errorDetails);
-      return "AI Error. Check console.";
+      const errorData = await response.json();
+      console.error("AI Error:", errorData);
+      alert(`AI Error: ${errorData.error?.message || "Unknown Error"}`);
+      return null;
     }
 
     const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Could not generate text.";
+    return data.candidates?.[0]?.content?.parts?.[0]?.text;
+
   } catch (error) {
-    console.error("Gemini API Error:", error);
-    return "Error contacting AI.";
+    console.error("Gemini System Error:", error);
+    alert("Network Error: Could not reach Google AI servers.");
+    return null;
   }
 };
-// --- PASTE YOUR FIREBASE CONFIG HERE ---
-// Delete the lines below and paste your config from the Firebase Console
+
+// --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
-apiKey: "AIzaSyA9gOiem_WQ-Q6HDgi3lir9wHmC5qyRyi0",
-    authDomain: "campus-gigs-2025.firebaseapp.com",
-    projectId: "campus-gigs-2025",
-    storageBucket: "campus-gigs-2025.firebasestorage.app",
-    messagingSenderId: "754098613110",
-    appId: "1:754098613110:web:0fd9cb1d2afc431c746857",
-    measurementId: "G-6Y44M1ELTE"
+  apiKey: "AIzaSyA9gOiem_WQ-Q6HDgi3lir9wHmC5qyRyi0",
+  authDomain: "campus-gigs-2025.firebaseapp.com",
+  projectId: "campus-gigs-2025",
+  storageBucket: "campus-gigs-2025.firebasestorage.app",
+  messagingSenderId: "754098613110",
+  appId: "1:754098613110:web:0fd9cb1d2afc431c746857",
+  measurementId: "G-6Y44M1ELTE"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = "campus-gigs-local"; // Local app ID
 
 // --- MAIN COMPONENT ---
 export default function CampusGigs() {
@@ -98,7 +105,8 @@ export default function CampusGigs() {
   // 2. Real-time Data Listener
   useEffect(() => {
     if (!user) return;
-    const gigsRef = collection(db, 'gigs'); // Simplified path for local use
+    // Using a simple 'gigs' collection at the root
+    const gigsRef = collection(db, 'gigs'); 
     const unsubscribe = onSnapshot(gigsRef, (snapshot) => {
       const gigsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       gigsData.sort((a, b) => {
@@ -120,11 +128,18 @@ export default function CampusGigs() {
   };
 
   const handleMagicDraft = async () => {
-    if (!newGig.title) return;
+    if (!newGig.title) {
+        alert("Please type a Title first!");
+        return;
+    }
     setAiLoading(true);
-    const prompt = `Write a short description for a campus task: "${newGig.title}".`;
+    const prompt = `Write a short, fun description for a student task titled: "${newGig.title}". Keep it under 20 words.`;
+    
     const result = await callGemini(prompt);
-    setNewGig(prev => ({ ...prev, description: result }));
+    
+    if (result) {
+        setNewGig(prev => ({ ...prev, description: result }));
+    }
     setAiLoading(false);
   };
 
@@ -135,9 +150,11 @@ export default function CampusGigs() {
       setPulseSummary("It's quiet on campus right now!");
       setAiLoading(false); return;
     }
-    const prompt = `Summarize the campus vibe based on these tasks: [${openGigTitles}].`;
+    const prompt = `Summarize the campus vibe based on these tasks: [${openGigTitles}]. Keep it fun and short (2 sentences).`;
     const result = await callGemini(prompt);
-    setPulseSummary(result);
+    if (result) {
+        setPulseSummary(result);
+    }
     setAiLoading(false);
   };
 
@@ -218,13 +235,30 @@ export default function CampusGigs() {
             <div className="flex justify-between">
               <h2 className="text-lg font-bold">Latest Gigs</h2>
               <div className="flex gap-2">
-                <button onClick={handleCampusPulse} disabled={aiLoading} className="bg-purple-100 text-purple-700 px-3 py-2 rounded-lg text-sm flex gap-2 items-center">
+                <button onClick={handleCampusPulse} disabled={aiLoading} className="bg-purple-100 text-purple-700 px-3 py-2 rounded-lg text-sm flex gap-2 items-center hover:bg-purple-200 transition">
                   {aiLoading && !newGig.title ? <Loader2 className="w-4 h-4 animate-spin"/> : <Sparkles className="w-4 h-4"/>} Pulse
                 </button>
-                <button onClick={() => setView('post')} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium flex gap-2"><PlusCircle className="w-4 h-4"/> Post</button>
+                <button onClick={() => setView('post')} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium flex gap-2 hover:bg-indigo-700 transition"><PlusCircle className="w-4 h-4"/> Post</button>
               </div>
             </div>
-            {pulseSummary && <div className="bg-purple-50 border border-purple-200 p-4 rounded-xl relative"><button onClick={() => setPulseSummary('')} className="absolute top-2 right-2"><X className="w-4 h-4 text-gray-400"/></button><h3 className="font-bold text-purple-800 text-sm">AI Pulse</h3><p className="text-sm">{pulseSummary}</p></div>}
+            
+            {pulseSummary && (
+                <div className="bg-purple-50 border border-purple-200 p-4 rounded-xl relative animate-in fade-in slide-in-from-top-4">
+                    <button onClick={() => setPulseSummary('')} className="absolute top-2 right-2 p-1 hover:bg-purple-100 rounded-full"><X className="w-4 h-4 text-gray-400"/></button>
+                    <div className="flex gap-3">
+                         <Sparkles className="w-5 h-5 text-purple-600 mt-1" />
+                         <div>
+                            <h3 className="font-bold text-purple-800 text-sm">AI Campus Vibe</h3>
+                            <p className="text-sm text-purple-900">{pulseSummary}</p>
+                         </div>
+                    </div>
+                </div>
+            )}
+            
+            {gigs.length === 0 && (
+                <div className="text-center py-10 text-gray-400 bg-white rounded-xl border border-dashed">No gigs yet. Be the first to post!</div>
+            )}
+
             {gigs.map(gig => (
               <div key={gig.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
                 <div className="flex justify-between mb-2">
@@ -236,11 +270,11 @@ export default function CampusGigs() {
                 <div className="flex gap-2 border-t pt-3">
                   {gig.createdBy === user.uid ? (
                     <>
-                      {gig.status !== 'COMPLETED' && <button onClick={() => handleCompleteGig(gig.id)} className="flex-1 bg-green-50 text-green-700 py-2 rounded-lg text-sm font-bold">Complete</button>}
-                      <button onClick={() => handleDeleteGig(gig.id)} className="px-3 bg-red-50 text-red-600 rounded-lg"><Trash2 className="w-4 h-4"/></button>
+                      {gig.status !== 'COMPLETED' && <button onClick={() => handleCompleteGig(gig.id)} className="flex-1 bg-green-50 text-green-700 py-2 rounded-lg text-sm font-bold hover:bg-green-100 transition">Complete</button>}
+                      <button onClick={() => handleDeleteGig(gig.id)} className="px-3 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition"><Trash2 className="w-4 h-4"/></button>
                     </>
                   ) : gig.status === 'OPEN' ? (
-                    <button onClick={() => handleClaimGig(gig.id)} className="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-sm font-bold">I'll Do It</button>
+                    <button onClick={() => handleClaimGig(gig.id)} className="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition">I'll Do It</button>
                   ) : (
                     <div className="flex-1 bg-gray-100 text-gray-500 py-2 rounded-lg text-sm font-bold text-center">{gig.status === 'COMPLETED' ? 'Done' : 'Taken'}</div>
                   )}
@@ -254,16 +288,21 @@ export default function CampusGigs() {
           <div className="bg-white p-6 rounded-xl shadow-sm">
             <h2 className="text-xl font-bold mb-6">Post Gig</h2>
             <form onSubmit={handlePostGig} className="space-y-4">
-              <input type="text" placeholder="Title" className="w-full px-4 py-2 border rounded-lg" value={newGig.title} onChange={e => setNewGig({...newGig, title: e.target.value})} required/>
+              <input type="text" placeholder="Title (e.g. Need Math Notes)" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={newGig.title} onChange={e => setNewGig({...newGig, title: e.target.value})} required/>
               <div>
-                <div className="flex justify-between mb-1"><label className="text-sm font-medium">Description</label><button type="button" onClick={handleMagicDraft} className="text-xs text-purple-600 font-bold flex gap-1 items-center">{aiLoading ? <Loader2 className="w-3 h-3 animate-spin"/> : <Wand2 className="w-3 h-3"/>} Magic Draft</button></div>
-                <textarea rows="3" className="w-full px-4 py-2 border rounded-lg" value={newGig.description} onChange={e => setNewGig({...newGig, description: e.target.value})}/>
+                <div className="flex justify-between mb-1">
+                    <label className="text-sm font-medium">Description</label>
+                    <button type="button" onClick={handleMagicDraft} className="text-xs text-purple-600 font-bold flex gap-1 items-center hover:text-purple-800 disabled:opacity-50" disabled={aiLoading || !newGig.title}>
+                        {aiLoading ? <Loader2 className="w-3 h-3 animate-spin"/> : <Wand2 className="w-3 h-3"/>} Magic Draft
+                    </button>
+                </div>
+                <textarea rows="3" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={newGig.description} onChange={e => setNewGig({...newGig, description: e.target.value})}/>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <input type="text" placeholder="Reward (e.g. 50)" className="w-full px-4 py-2 border rounded-lg" value={newGig.reward} onChange={e => setNewGig({...newGig, reward: e.target.value})} required/>
-                <input type="text" placeholder="Location" className="w-full px-4 py-2 border rounded-lg" value={newGig.location} onChange={e => setNewGig({...newGig, location: e.target.value})}/>
+                <input type="text" placeholder="Reward (e.g. 50)" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={newGig.reward} onChange={e => setNewGig({...newGig, reward: e.target.value})} required/>
+                <input type="text" placeholder="Location" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={newGig.location} onChange={e => setNewGig({...newGig, location: e.target.value})}/>
               </div>
-              <div className="flex gap-2"><button type="button" onClick={() => setView('feed')} className="flex-1 border py-2 rounded-lg">Cancel</button><button type="submit" className="flex-1 bg-indigo-600 text-white py-2 rounded-lg font-bold">Post</button></div>
+              <div className="flex gap-2"><button type="button" onClick={() => setView('feed')} className="flex-1 border py-2 rounded-lg hover:bg-gray-50">Cancel</button><button type="submit" className="flex-1 bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700">Post</button></div>
             </form>
           </div>
         )}
@@ -272,7 +311,8 @@ export default function CampusGigs() {
            <div className="bg-white p-6 rounded-xl text-center">
              <div className="w-20 h-20 bg-indigo-100 rounded-full mx-auto mb-4 flex items-center justify-center"><User className="w-10 h-10 text-indigo-600"/></div>
              <h2 className="text-2xl font-bold">{username}</h2>
-             <button onClick={handleLogout} className="mt-8 text-red-500 flex items-center justify-center gap-2 mx-auto"><LogOut className="w-4 h-4"/> Sign Out</button>
+             <p className="text-gray-500 text-sm mb-6">Student Runner</p>
+             <button onClick={handleLogout} className="mt-8 text-red-500 flex items-center justify-center gap-2 mx-auto hover:text-red-700"><LogOut className="w-4 h-4"/> Sign Out</button>
            </div>
         )}
       </main>
