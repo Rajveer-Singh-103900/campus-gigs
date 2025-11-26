@@ -13,20 +13,28 @@ import {
 } from 'lucide-react';
 
 // --- GEMINI API SETUP ---
-// Leave this empty if you don't have a Gemini Key yet, the app will still work (just without AI)
 const apiKey = "AIzaSyADpSkuU4M0Uk_5OPmSiACvylZ4GuG_7Ng"; 
 
 const callGemini = async (prompt) => {
-  if (!apiKey) return "AI Key missing.";
   try {
+    // We are using the stable 'gemini-1.5-flash' model here
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
       }
     );
+
+    if (!response.ok) {
+      const errorDetails = await response.json();
+      console.error("API Error:", errorDetails);
+      return "AI Error. Check console.";
+    }
+
     const data = await response.json();
     return data.candidates?.[0]?.content?.parts?.[0]?.text || "Could not generate text.";
   } catch (error) {
@@ -34,7 +42,6 @@ const callGemini = async (prompt) => {
     return "Error contacting AI.";
   }
 };
-
 // --- PASTE YOUR FIREBASE CONFIG HERE ---
 // Delete the lines below and paste your config from the Firebase Console
 const firebaseConfig = {
